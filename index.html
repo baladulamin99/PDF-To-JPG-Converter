@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF থেকে JPG রূপান্তরকারী</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .drop-zone {
+            border: 2px dashed #3b82f6;
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover {
+            background-color: #eff6ff;
+            border-color: #2563eb;
+        }
+        #canvas-container {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <!-- Header Section -->
+    <header class="w-full max-w-4xl text-center mb-10">
+        <h1 class="text-4xl font-bold text-gray-800 mb-2">PDF থেকে JPG কনভার্টার</h1>
+        <p class="text-gray-600">এক বা একাধিক PDF ফাইল আপলোড করুন এবং প্রতিটি পৃষ্ঠাকে ছবিতে রূপান্তর করুন</p>
+    </header>
+
+    <!-- Main Tool Card -->
+    <main class="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-6 md:p-10">
+        
+        <!-- Upload Area -->
+        <div id="upload-area" class="drop-zone rounded-xl p-10 text-center cursor-pointer mb-6">
+            <input type="file" id="pdf-upload" accept="application/pdf" class="hidden" multiple>
+            <div class="flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p class="text-xl font-semibold text-gray-700">এক বা একাধিক PDF ফাইল ড্র্যাগ করুন অথবা ক্লিক করুন</p>
+                <p class="text-sm text-gray-500 mt-2">আপনি একসাথে অনেকগুলো ফাইল সিলেক্ট করতে পারেন</p>
+            </div>
+        </div>
+
+        <!-- Processing Status -->
+        <div id="status-area" class="hidden mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <span id="status-text" class="text-blue-600 font-medium">প্রসেসিং হচ্ছে...</span>
+                <span id="progress-percent" class="text-gray-600">০%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <p id="file-info" class="text-xs text-gray-500 mt-2 text-center"></p>
+        </div>
+
+        <!-- Results Preview Area -->
+        <div id="results-area" class="hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <h2 class="text-2xl font-bold text-gray-800 text-center sm:text-left">রূপান্তরিত ছবিসমূহ</h2>
+                <div class="flex gap-2">
+                    <button id="download-zip-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center transition shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        সবগুলো ZIP হিসেবে নামান
+                    </button>
+                    <button id="clear-btn" class="text-red-500 hover:text-red-700 font-medium flex items-center px-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        মুছুন
+                    </button>
+                </div>
+            </div>
+            <div id="image-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Images will be injected here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Hidden Canvas for processing -->
+    <div id="canvas-container">
+        <canvas id="pdf-canvas"></canvas>
+    </div>
+
+    <!-- Instructions -->
+    <section class="mt-12 max-w-4xl w-full">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                <h3 class="font-bold text-blue-800 mb-2">১. ফাইল বাচাই করুন</h3>
+                <p class="text-sm text-blue-700">একাধিক PDF ফাইল একসাথে সিলেক্ট করে আপলোড করুন।</p>
+            </div>
+            <div class="bg-green-50 p-6 rounded-xl border border-green-100">
+                <h3 class="font-bold text-green-800 mb-2">২. প্রসেসিং</h3>
+                <p class="text-sm text-green-700">সফটওয়্যারটি প্রতিটি ফাইলের পাতাকে ক্রমানুসারে কনভার্ট করবে।</p>
+            </div>
+            <div class="bg-purple-50 p-6 rounded-xl border border-purple-100">
+                <h3 class="font-bold text-purple-800 mb-2">৩. সেভ করুন</h3>
+                <p class="text-sm text-purple-700">সবগুলো ছবি একটি মাত্র ZIP ফাইলে ডাউনলোড করে নিন।</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="mt-auto py-8 text-gray-500 text-sm text-center">
+        নিরাপদ ও স্থানীয় প্রসেসিং - আপনার ডাটা আপনার ব্রাউজারেই থাকে।
+    </footer>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('pdf-upload');
+        const statusArea = document.getElementById('status-area');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        const statusText = document.getElementById('status-text');
+        const fileInfo = document.getElementById('file-info');
+        const resultsArea = document.getElementById('results-area');
+        const imageGrid = document.getElementById('image-grid');
+        const clearBtn = document.getElementById('clear-btn');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        const canvas = document.getElementById('pdf-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let convertedImages = []; 
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('bg-blue-50');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('bg-blue-50');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('bg-blue-50');
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+            if (files.length > 0) {
+                processMultiplePDFs(files);
+            } else {
+                alert('অনুগ্রহ করে এক বা একাধিক বৈধ PDF ফাইল আপলোড করুন।');
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                processMultiplePDFs(Array.from(e.target.files));
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            imageGrid.innerHTML = '';
+            convertedImages = [];
+            resultsArea.classList.add('hidden');
+            uploadArea.classList.remove('hidden');
+            fileInput.value = '';
+        });
+
+        async function processMultiplePDFs(files) {
+            uploadArea.classList.add('hidden');
+            statusArea.classList.remove('hidden');
+            imageGrid.innerHTML = '';
+            convertedImages = [];
+            
+            let totalProcessedPages = 0;
+            
+            try {
+                // First pass to count total pages for global progress
+                let totalExpectedPages = 0;
+                for (const file of files) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    totalExpectedPages += pdf.numPages;
+                }
+
+                for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
+                    const file = files[fileIdx];
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    const numPages = pdf.numPages;
+                    const fileName = file.name;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        totalProcessedPages++;
+                        const globalPercent = Math.round((totalProcessedPages / totalExpectedPages) * 100);
+                        
+                        statusText.innerText = `প্রসেসিং ফাইল (${fileIdx + 1}/${files.length}): ${fileName}`;
+                        fileInfo.innerText = `পৃষ্ঠা ${i}/${numPages} (মোট প্রগতি: ${globalPercent}%)`;
+                        progressBar.style.width = `${globalPercent}%`;
+                        progressPercent.innerText = `${globalPercent}%`;
+
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 });
+                        
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+
+                        await page.render({
+                            canvasContext: ctx,
+                            viewport: viewport
+                        }).promise;
+
+                        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        const uniqueName = `${fileName.replace('.pdf', '')}_page_${i}`;
+                        convertedImages.push({ dataUrl: imageDataUrl, name: uniqueName });
+                        
+                        createImageCard(imageDataUrl, uniqueName);
+                    }
+                }
+
+                statusArea.classList.add('hidden');
+                resultsArea.classList.remove('hidden');
+                progressBar.style.width = '0%';
+
+            } catch (error) {
+                console.error(error);
+                alert('দুঃখিত! ফাইলগুলো প্রসেস করতে সমস্যা হয়েছে।');
+                uploadArea.classList.remove('hidden');
+                statusArea.classList.add('hidden');
+            }
+        }
+
+        function createImageCard(dataUrl, title) {
+            const div = document.createElement('div');
+            div.className = 'bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm transition hover:shadow-md';
+            
+            div.innerHTML = `
+                <div class="relative aspect-[3/4] bg-white">
+                    <img src="${dataUrl}" class="w-full h-full object-contain p-2" alt="${title}">
+                    <div class="absolute top-2 left-2 bg-blue-600 text-white text-[10px] px-2 py-1 rounded shadow max-w-[80%] truncate">
+                        ${title}
+                    </div>
+                </div>
+                <div class="p-3 bg-white border-t border-gray-100 flex justify-center">
+                    <button onclick="downloadImage('${dataUrl}', '${title}')" class="w-full bg-gray-800 hover:bg-black text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        ডাউনলোড
+                    </button>
+                </div>
+            `;
+            imageGrid.appendChild(div);
+        }
+
+        window.downloadImage = function(dataUrl, title) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `${title}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        downloadZipBtn.addEventListener('click', async () => {
+            if (convertedImages.length === 0) return;
+
+            const zip = new JSZip();
+            const imgFolder = zip.folder("converted_images");
+
+            convertedImages.forEach((img) => {
+                const base64Data = img.dataUrl.split(',')[1];
+                imgFolder.file(`${img.name}.jpg`, base64Data, {base64: true});
+            });
+
+            const content = await zip.generateAsync({type: "blob"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "all_pdf_pages.zip";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
+</body>
+</html>
