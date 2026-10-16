@@ -1,288 +1,292 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF থেকে JPG রূপান্তরকারী</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Hind Siliguri', sans-serif;
-            background-color: #f3f4f6;
-        }
-        .drop-zone {
-            border: 2px dashed #3b82f6;
-            transition: all 0.3s ease;
-        }
-        .drop-zone:hover {
-            background-color: #eff6ff;
-            border-color: #2563eb;
-        }
-        #canvas-container {
-            display: none;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ডকুমেন্ট থেকে JPG</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+<style>
+:root{--bg:#f6f7f4;--card:#fff;--ink:#1d2a26;--mute:#5d6b66;--line:#d9ddd6;--accent:#0f6b52;--accent-ink:#fff;--err:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#141a18;--card:#1c2421;--ink:#e8eeea;--mute:#9aa8a2;--line:#2f3a36;--accent:#4cc9a0;--accent-ink:#0b1713;--err:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Noto Sans Bengali","Kalpurush","SolaimanLipi",system-ui,sans-serif}
+main{max-width:920px;margin:0 auto;padding:24px 16px 64px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:1.6rem;margin:0}.sub{color:var(--mute);margin:4px 0 20px}
+button,select,input{font:inherit;color:inherit}
+.btn{display:inline-block;background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:10px 18px;cursor:pointer;font-weight:600;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+#clear{margin-left:auto;color:var(--err);border-color:var(--err)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#drop{border:2px dashed var(--line);border-radius:12px;background:var(--card);padding:36px 16px;text-align:center;cursor:pointer}
+#drop.over{border-color:var(--accent)}#drop p{margin:4px 0}
+.opts{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0;align-items:end}
+.opts label{display:flex;flex-direction:column;font-size:.9rem;color:var(--mute);gap:4px}
+select,input[type=text]{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-width:180px}
+#queue{list-style:none;padding:0;margin:0}
+#queue li{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:.95rem}
+#queue button{background:none;border:0;color:var(--err);cursor:pointer}
+progress{width:100%;height:12px;accent-color:var(--accent)}
+.file{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:16px 0}
+.file h3{margin:0 0 4px;font-size:1.05rem;word-break:break-all}
+.err{color:var(--err)}.meta{color:var(--mute);font-size:.85rem}
+.warn{background:color-mix(in srgb,#e0a100 14%,var(--card));border:1px solid #e0a100;border-radius:8px;padding:8px 12px;font-size:.88rem;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
+.pg{border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center}
+.pg img{width:100%;height:auto;display:block;background:#fff;border:1px solid var(--line)}
+.pg a{display:inline-block;margin-top:4px;color:var(--accent);font-size:.85rem}
+.note{font-size:.85rem;color:var(--mute);margin-top:24px}
+[hidden]{display:none!important}
+</style>
 </head>
-<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+<body>
+<main>
+<header><h1 data-i="title"></h1><button class="btn ghost" id="lang" type="button">English</button></header>
+<p class="sub" data-i="sub"></p>
 
-    <!-- Header Section -->
-    <header class="w-full max-w-4xl text-center mb-10">
-        <h1 class="text-4xl font-bold text-gray-800 mb-2">PDF থেকে JPG কনভার্টার</h1>
-        <p class="text-gray-600">এক বা একাধিক PDF ফাইল আপলোড করুন এবং প্রতিটি পৃষ্ঠাকে ছবিতে রূপান্তর করুন</p>
-    </header>
+<div id="drop" tabindex="0" role="button">
+  <p><strong data-i="drop"></strong></p>
+  <p class="meta" data-i="types"></p>
+  <input id="file" type="file" multiple hidden accept=".pdf,.doc,.docx,.xls,.xlsx">
+</div>
+<ul id="queue"></ul>
 
-    <!-- Main Tool Card -->
-    <main class="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-6 md:p-10">
-        
-        <!-- Upload Area -->
-        <div id="upload-area" class="drop-zone rounded-xl p-10 text-center cursor-pointer mb-6">
-            <input type="file" id="pdf-upload" accept="application/pdf" class="hidden" multiple>
-            <div class="flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <p class="text-xl font-semibold text-gray-700">এক বা একাধিক PDF ফাইল ড্র্যাগ করুন অথবা ক্লিক করুন</p>
-                <p class="text-sm text-gray-500 mt-2">আপনি একসাথে অনেকগুলো ফাইল সিলেক্ট করতে পারেন</p>
-            </div>
-        </div>
+<div class="opts">
+  <label><span data-i="mode"></span>
+    <select id="mode"><option value="browser" data-i="m_browser"></option><option value="server" data-i="m_server"></option></select></label>
+  <label id="srvw" hidden><span data-i="srv"></span><input id="srv" type="text" placeholder="https://example.com"></label>
+  <label><span data-i="dpi"></span>
+    <select id="dpi"><option value="original" data-i="orig"></option><option value="72" data-i="o72"></option><option>150</option><option>200</option><option>300</option><option>600</option></select></label>
+  <label><span><span data-i="quality"></span>: <b id="qv">95</b>%</span><input id="q" type="range" min="70" max="100" value="95"></label>
+  <button class="btn" id="go" disabled data-i="convert"></button>
+  <button class="btn ghost" id="clear" type="button" data-i="clear"></button>
+</div>
+<div class="warn" id="bwarn" data-i="bwarn"></div>
 
-        <!-- Processing Status -->
-        <div id="status-area" class="hidden mb-6">
-            <div class="flex items-center justify-between mb-2">
-                <span id="status-text" class="text-blue-600 font-medium">প্রসেসিং হচ্ছে...</span>
-                <span id="progress-percent" class="text-gray-600">০%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-            </div>
-            <p id="file-info" class="text-xs text-gray-500 mt-2 text-center"></p>
-        </div>
+<div id="prog" hidden><progress id="bar" value="0" max="1"></progress><div class="meta" id="ptxt"></div></div>
+<div id="zipbar" hidden><button class="btn" id="zip" type="button" data-i="zip"></button></div>
+<div id="results"></div>
+<p class="note" data-i="note"></p>
+</main>
 
-        <!-- Results Preview Area -->
-        <div id="results-area" class="hidden">
-            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <h2 class="text-2xl font-bold text-gray-800 text-center sm:text-left">রূপান্তরিত ছবিসমূহ</h2>
-                <div class="flex gap-2">
-                    <button id="download-zip-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center transition shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        সবগুলো ZIP হিসেবে নামান
-                    </button>
-                    <button id="clear-btn" class="text-red-500 hover:text-red-700 font-medium flex items-center px-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        মুছুন
-                    </button>
-                </div>
-            </div>
-            <div id="image-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                <!-- Images will be injected here -->
-            </div>
-        </div>
-    </main>
+<script>
+const T={
+bn:{title:"ডকুমেন্ট থেকে JPG",sub:"Word, Excel ও PDF-এর প্রতিটি পেজ মূল পেজ সাইজ ও অরিয়েন্টেশন অনুযায়ী JPG-তে রূপান্তর করুন। আপনার ফাইল অপরিবর্তিত থাকে।",
+drop:"ফাইল এখানে ছেড়ে দিন বা ক্লিক করে বাছাই করুন",types:"Word (.doc .docx) · Excel (.xls .xlsx) · PDF · সর্বোচ্চ ৫০ MB",
+mode:"রূপান্তর পদ্ধতি",m_browser:"ব্রাউজারে (সার্ভার লাগে না)",m_server:"সার্ভারে (হুবহু, LibreOffice)",srv:"সার্ভারের ঠিকানা (খালি = একই সাইট)",
+dpi:"রেজোলিউশন (DPI)",orig:"মূল পেজ সেটআপ অনুযায়ী (Original, ৩০০ DPI)",o72:"PDF-এর হুবহু মাপ (72 DPI, ১ পয়েন্ট = ১ পিক্সেল)",quality:"JPG কোয়ালিটি",convert:"JPG-তে রূপান্তর করুন",clear:"সব মুছুন",
+zip:"সব ডাউনলোড (ZIP)",dl:"ডাউনলোড",page:"পেজ",remove:"বাদ দিন",working:"রূপান্তর চলছে",of:"/",pages:"পেজ",
+bwarn:"ব্রাউজার পদ্ধতিতে PDF হুবহু রূপান্তর হয়। Word (.docx) ও Excel (.xlsx) প্রায় একই হয়, তবে ফন্ট ও লেআউটে সামান্য পার্থক্য হতে পারে। ১০০% মিল দরকার হলে সার্ভার পদ্ধতি ব্যবহার করুন। .doc ও .xls শুধু সার্ভার পদ্ধতিতে চলে।",
+note:"ব্রাউজার পদ্ধতিতে আপনার ফাইল ডিভাইসের বাইরে যায় না। সার্ভার পদ্ধতিতে রূপান্তরিত ফাইল ২০ মিনিট পর মুছে যায়।",
+e:{unsupported:"অসমর্থিত ফরম্যাট। শুধু .pdf .doc .docx .xls .xlsx চলবে।",too_big:"ফাইল ৫০ MB-এর বেশি।",encrypted:"ফাইলটি পাসওয়ার্ড-প্রটেক্টেড।",corrupt:"ফাইলটি নষ্ট বা পড়া যাচ্ছে না।",invalid_pdf:"এটি বৈধ PDF নয়।",timeout:"রূপান্তরে অনেক সময় লাগছে।",too_large:"পেজ সাইজ × DPI খুব বেশি। DPI কমান।",failed:"রূপান্তর ব্যর্থ হয়েছে।",expired:"সময় শেষ, আবার আপলোড করুন।",need_server:"এই ফরম্যাট (.doc/.xls) শুধু সার্ভার পদ্ধতিতে চলে। .docx/.xlsx হিসেবে সেভ করুন বা সার্ভার পদ্ধতি বেছে নিন।",net:"সার্ভারে সংযোগ করা যায়নি।"}},
+en:{title:"Document to JPG",sub:"Convert every page of Word, Excel and PDF files to JPG at its original page size and orientation. Your files are never modified.",
+drop:"Drop files here or click to choose",types:"Word (.doc .docx) · Excel (.xls .xlsx) · PDF · up to 50 MB each",
+mode:"Conversion method",m_browser:"In browser (no server)",m_server:"On server (exact, LibreOffice)",srv:"Server URL (blank = same site)",
+dpi:"Resolution (DPI)",orig:"Original page setup (Original, 300 DPI)",o72:"Exact PDF size (72 DPI, 1 point = 1 pixel)",quality:"JPG quality",convert:"Convert to JPG",clear:"Clear all",
+zip:"Download all (ZIP)",dl:"Download",page:"Page",remove:"Remove",working:"Converting",of:"/",pages:"pages",
+bwarn:"In-browser mode converts PDFs exactly. Word (.docx) and Excel (.xlsx) come out close, but fonts and layout can differ slightly. Use server mode when you need an exact match. .doc and .xls work only in server mode.",
+note:"In-browser mode never uploads your files. In server mode, converted files are deleted after 20 minutes.",
+e:{unsupported:"Unsupported format. Use .pdf .doc .docx .xls .xlsx.",too_big:"File is over 50 MB.",encrypted:"File is password-protected.",corrupt:"File is corrupted or unreadable.",invalid_pdf:"Not a valid PDF.",timeout:"Conversion timed out.",too_large:"Page size × DPI is too large. Lower the DPI.",failed:"Conversion failed.",expired:"Session expired. Upload again.",need_server:"This format (.doc/.xls) works only in server mode. Save as .docx/.xlsx or choose server mode.",net:"Could not reach the server."}}};
+const MAX=50*1048576,$=s=>document.querySelector(s);
+let L="bn",files=[],results=[],srvJob=null;
+class CE extends Error{}
+function tr(){document.documentElement.lang=L;document.querySelectorAll("[data-i]").forEach(e=>e.textContent=T[L][e.dataset.i]);
+ $("#lang").textContent=L=="bn"?"English":"বাংলা";drawQ();drawRes()}
+$("#lang").onclick=()=>{L=L=="bn"?"en":"bn";tr()};
+function drawQ(){const q=$("#queue");q.innerHTML="";files.forEach((f,i)=>{const li=document.createElement("li");
+ li.innerHTML="<span></span><button type=button></button>";li.firstChild.textContent=`${f.name} (${(f.size/1048576).toFixed(1)} MB)`;
+ li.lastChild.textContent=T[L].remove;li.lastChild.onclick=()=>{files.splice(i,1);drawQ()};q.appendChild(li)});$("#go").disabled=!files.length}
+const drop=$("#drop");
+drop.onclick=()=>$("#file").click();
+drop.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();$("#file").click()}};
+$("#file").onchange=e=>{files.push(...e.target.files);e.target.value="";drawQ()};
+["dragover","dragenter"].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.remove("over")}));
+drop.addEventListener("drop",e=>{files.push(...e.dataTransfer.files);drawQ()});
+$("#q").oninput=e=>$("#qv").textContent=e.target.value;
+$("#srv").value=localStorage.getItem("srv")||"";
+$("#srv").onchange=e=>localStorage.setItem("srv",e.target.value.trim());
+$("#mode").onchange=()=>{const s=$("#mode").value=="server";$("#srvw").hidden=!s;$("#bwarn").hidden=s};
+$("#bwarn").hidden=false;
+// If this page is served by the bundled backend, use server mode automatically.
+fetch("/api/ping").then(r=>r.ok&&r.json()).then(j=>{if(j&&j.ok){$("#mode").value="server";$("#mode").onchange()}}).catch(()=>{});
 
-    <!-- Hidden Canvas for processing -->
-    <div id="canvas-container">
-        <canvas id="pdf-canvas"></canvas>
-    </div>
+const dpiVal=()=>$("#dpi").value=="original"?300:+$("#dpi").value;
+const jpg=async(canvas,q,dpi)=>{const b=await new Promise((res,rej)=>canvas.toBlob(x=>x?res(x):rej(new CE("too_large")),"image/jpeg",q/100));
+ const u=new Uint8Array(await b.arrayBuffer());
+ if(u[2]==0xFF&&u[3]==0xE0&&u[6]==0x4A){u[13]=1;u[14]=dpi>>8;u[15]=dpi&255;u[16]=dpi>>8;u[17]=dpi&255}   // units=dpi, X/Y density
+ return new Blob([u],{type:"image/jpeg"})};
+const pad=n=>String(n).padStart(2,"0");
+const pageInfo=(name,blob,wpx,hpx,dpi)=>({name,blob,url:URL.createObjectURL(blob),w_in:+(wpx/dpi).toFixed(2),h_in:+(hpx/dpi).toFixed(2),wpx,hpx});
+const tick=()=>new Promise(r=>setTimeout(r));
 
-    <!-- Instructions -->
-    <section class="mt-12 max-w-4xl w-full">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                <h3 class="font-bold text-blue-800 mb-2">১. ফাইল বাচাই করুন</h3>
-                <p class="text-sm text-blue-700">একাধিক PDF ফাইল একসাথে সিলেক্ট করে আপলোড করুন।</p>
-            </div>
-            <div class="bg-green-50 p-6 rounded-xl border border-green-100">
-                <h3 class="font-bold text-green-800 mb-2">২. প্রসেসিং</h3>
-                <p class="text-sm text-green-700">সফটওয়্যারটি প্রতিটি ফাইলের পাতাকে ক্রমানুসারে কনভার্ট করবে।</p>
-            </div>
-            <div class="bg-purple-50 p-6 rounded-xl border border-purple-100">
-                <h3 class="font-bold text-purple-800 mb-2">৩. সেভ করুন</h3>
-                <p class="text-sm text-purple-700">সবগুলো ছবি একটি মাত্র ZIP ফাইলে ডাউনলোড করে নিন।</p>
-            </div>
-        </div>
-    </section>
+async function pdfToPages(buf,dpi,q,stem,prog){
+ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+ let pdf;
+ try{pdf=await pdfjsLib.getDocument({data:buf}).promise}
+ catch(e){throw new CE(e.name=="PasswordException"?"encrypted":"invalid_pdf")}
+ const out=[];
+ for(let i=1;i<=pdf.numPages;i++){
+  prog(i,pdf.numPages);
+  const page=await pdf.getPage(i),vp=page.getViewport({scale:dpi/72}); // honours page size + rotation
+  const w=Math.round(vp.width),h=Math.round(vp.height);
+  if(w*h>268e6||w>32767||h>32767)throw new CE("too_large");
+  const c=document.createElement("canvas");c.width=w;c.height=h;
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,w,h);
+  await page.render({canvasContext:x,viewport:vp}).promise;
+  out.push(pageInfo(`${stem}_page${pad(i)}.jpg`,await jpg(c,q,dpi),w,h,dpi));
+  c.width=c.height=0;await tick();
+ }
+ return out;
+}
 
-    <footer class="mt-auto py-8 text-gray-500 text-sm text-center">
-        নিরাপদ ও স্থানীয় প্রসেসিং - আপনার ডাটা আপনার ব্রাউজারেই থাকে।
-    </footer>
+function offscreen(){const d=document.createElement("div");d.style.cssText="position:fixed;left:-99999px;top:0;";document.body.append(d);return d}
 
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+async function docxToPages(buf,dpi,q,stem,prog){
+ const host=offscreen();
+ const st=document.createElement("style");
+ st.textContent=".docx-wrapper{background:#fff!important;padding:0!important}.docx-wrapper>section.docx{box-shadow:none!important;margin:0 0 20px 0!important}";
+ host.append(st);
+ try{
+  try{await docx.renderAsync(buf,host,null,{className:"docx",inWrapper:true,ignoreWidth:false,ignoreHeight:false,breakPages:true,renderHeaders:true,renderFooters:true,renderFootnotes:true,useBase64URL:true})}
+  catch{throw new CE("corrupt")}
+  await (document.fonts&&document.fonts.ready);
+  const secs=[...host.querySelectorAll("section.docx")],out=[],sc=dpi/96;
+  for(let i=0;i<secs.length;i++){
+   prog(i+1,secs.length);
+   const s=secs[i];
+   if(s.offsetWidth*s.offsetHeight*sc*sc>268e6)throw new CE("too_large");
+   const c=await html2canvas(s,{scale:sc,backgroundColor:"#fff",useCORS:true,logging:false});
+   out.push(pageInfo(`${stem}_page${pad(i+1)}.jpg`,await jpg(c,q,dpi),c.width,c.height,dpi));
+   c.width=c.height=0;await tick();
+  }
+  if(!out.length)throw new CE("corrupt");
+  return out;
+ }finally{host.remove()}
+}
 
-        const uploadArea = document.getElementById('upload-area');
-        const fileInput = document.getElementById('pdf-upload');
-        const statusArea = document.getElementById('status-area');
-        const progressBar = document.getElementById('progress-bar');
-        const progressPercent = document.getElementById('progress-percent');
-        const statusText = document.getElementById('status-text');
-        const fileInfo = document.getElementById('file-info');
-        const resultsArea = document.getElementById('results-area');
-        const imageGrid = document.getElementById('image-grid');
-        const clearBtn = document.getElementById('clear-btn');
-        const downloadZipBtn = document.getElementById('download-zip-btn');
-        const canvas = document.getElementById('pdf-canvas');
-        const ctx = canvas.getContext('2d');
+const PAPER={1:[8.5,11],5:[8.5,14],7:[7.25,10.5],8:[11.69,16.54],9:[8.27,11.69],11:[5.83,8.27],13:[7.17,10.12]};
+async function xlsxToPages(buf,dpi,q,stem,prog){
+ let wb;try{wb=XLSX.read(buf,{type:"array"})}catch{throw new CE("corrupt")}
+ const names=(wb.Workbook&&wb.Workbook.Names)||[],out=[],sc=dpi/96;let n=0;
+ for(let si=0;si<wb.SheetNames.length;si++){
+  const ws=wb.Sheets[wb.SheetNames[si]];if(!ws||!ws["!ref"])continue;
+  const pa=names.find(x=>x.Name=="_xlnm.Print_Area"&&x.Sheet===si);   // honour Print Area
+  if(pa){try{ws["!ref"]=pa.Ref.split("!").pop().replace(/\$/g,"").split(",")[0]}catch{}}
+  const ps=ws["!pageSetup"]||{},mg=ws["!margins"]||{};
+  let [pw,ph]=PAPER[ps.paperSize]||PAPER[9];if(ps.orientation=="landscape")[pw,ph]=[ph,pw];
+  const ml=mg.left??.7,mr=mg.right??.7,mt=mg.top??.75,mb=mg.bottom??.75;
+  const W=pw*96,H=ph*96,cw=(pw-ml-mr)*96,ch=(ph-mt-mb)*96;
+  const html=new DOMParser().parseFromString(XLSX.utils.sheet_to_html(ws),"text/html");
+  const table=html.querySelector("table");if(!table)continue;
+  const host=offscreen();host.style.cssText+="font:11pt Calibri,Carlito,Arial,sans-serif;color:#000;";
+  const st=document.createElement("style");st.textContent="table{border-collapse:collapse;white-space:nowrap}td,th{padding:1px 4px;font-weight:normal;vertical-align:bottom}";
+  host.append(st);const holder=document.createElement("div");holder.style.cssText="display:inline-block";holder.append(document.importNode(table,true));host.append(holder);
+  try{
+   const t=holder.querySelector("table"),tw=t.offsetWidth,s=Math.min(1,cw/tw),t0=t.getBoundingClientRect().top;
+   const rows=[...t.rows].map(r=>{const b=r.getBoundingClientRect();return{top:(b.top-t0)*s,bot:(b.bottom-t0)*s}});
+   const groups=[];let start=0,first=0;
+   rows.forEach((r,i)=>{if(r.bot-start>ch&&i>first){groups.push(start);start=r.top;first=i}});groups.push(start);
+   for(let g=0;g<groups.length;g++){
+    n++;prog(n,"…");
+    const pg=document.createElement("div");pg.style.cssText=`position:relative;width:${W}px;height:${H}px;background:#fff;overflow:hidden`;
+    const view=document.createElement("div");view.style.cssText=`position:absolute;left:${ml*96}px;top:${mt*96}px;width:${cw}px;height:${ch}px;overflow:hidden`;
+    const inner=document.createElement("div");inner.style.cssText=`transform-origin:0 0;transform:translateY(${-groups[g]}px) scale(${s});display:inline-block`;
+    inner.append(t.cloneNode(true));view.append(inner);pg.append(view);host.append(pg);
+    const c=await html2canvas(pg,{scale:sc,backgroundColor:"#fff",logging:false});
+    out.push(pageInfo(`${stem}_page${pad(n)}.jpg`,await jpg(c,q,dpi),c.width,c.height,dpi));
+    pg.remove();c.width=c.height=0;await tick();
+   }
+  }finally{host.remove()}
+ }
+ if(!out.length)throw new CE("corrupt");
+ return out;
+}
 
-        let convertedImages = []; 
+async function convertLocal(f,dpi,q,prog){
+ const ext=f.name.split(".").pop().toLowerCase(),stem=f.name.replace(/\.[^.]+$/,"").replace(/[\\/:*?"<>|\s]+/g,"_");
+ if(!["pdf","docx","xlsx","doc","xls"].includes(ext))throw new CE("unsupported");
+ if(f.size>MAX)throw new CE("too_big");
+ if(ext=="doc"||ext=="xls")throw new CE("need_server");
+ const buf=await f.arrayBuffer();               // file is only read, never changed
+ const fn=ext=="pdf"?pdfToPages:ext=="docx"?docxToPages:xlsxToPages;
+ return fn(buf,dpi,q,stem,prog);
+}
 
-        uploadArea.addEventListener('click', () => fileInput.click());
+function base(){return $("#srv").value.trim().replace(/\/$/,"")}
+async function convertServer(dpi,q){
+ const fd=new FormData();files.forEach(f=>fd.append("files",f));
+ fd.append("dpi",$("#dpi").value);fd.append("quality",q);
+ let r;try{r=await fetch(base()+"/api/convert",{method:"POST",body:fd});if(!r.ok)throw 0}catch{throw new CE("net")}
+ const {job_id}=await r.json();
+ for(;;){
+  const s=await fetch(`${base()}/api/jobs/${job_id}`);if(!s.ok)throw new CE("expired");
+  const j=await s.json();$("#bar").max=j.total;$("#bar").value=j.done;
+  $("#ptxt").textContent=`${T[L].working}: ${j.done} ${T[L].of} ${j.total}`;
+  results=j.files.map(f=>({name:f.original,error:f.status=="error"?f.error:null,pages:(f.pages||[]).map(p=>({name:p.name,
+   url:`${base()}/api/jobs/${job_id}/img/${f.folder}/${p.name}`,dl:`${base()}/api/jobs/${job_id}/img/${f.folder}/${p.name}?download=1`,
+   w_in:p.width_in,h_in:p.height_in,wpx:p.width_px,hpx:p.height_px}))}));drawRes();
+  if(j.status=="done"){srvJob=`${base()}/api/jobs/${job_id}/zip`;return}
+  await new Promise(r=>setTimeout(r,1000));
+ }
+}
 
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('bg-blue-50');
-        });
+$("#go").onclick=async()=>{
+ const dpi=dpiVal(),q=+$("#q").value,server=$("#mode").value=="server";
+ results.forEach(f=>f.pages.forEach(p=>URL.revokeObjectURL(p.url)));results=[];srvJob=null;
+ $("#go").disabled=true;$("#clear").disabled=true;$("#zipbar").hidden=true;$("#prog").hidden=false;$("#bar").max=files.length;$("#bar").value=0;drawRes();
+ try{
+  if(server)await convertServer(dpi,q);
+  else for(let i=0;i<files.length;i++){
+   const f=files[i],r={name:f.name,error:null,pages:[]};results.push(r);
+   const prog=(p,t)=>{$("#ptxt").textContent=`${T[L].working}: ${f.name} (${T[L].page} ${p}${t=="…"?"":" "+T[L].of+" "+t})`};
+   try{r.pages=await convertLocal(f,dpi,q,prog)}
+   catch(e){r.error=e instanceof CE?e.message:"failed";console.error(e)}
+   $("#bar").value=i+1;drawRes();
+  }
+ }catch(e){$("#ptxt").textContent=T[L].e[e.message]||T[L].e.failed}
+ $("#prog").hidden=true;$("#go").disabled=!files.length;$("#clear").disabled=false;
+ if(results.some(f=>f.pages.length))$("#zipbar").hidden=false;
+};
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('bg-blue-50');
-        });
+$("#clear").onclick=()=>{
+ results.forEach(f=>f.pages.forEach(p=>p.blob&&URL.revokeObjectURL(p.url)));
+ results=[];files=[];srvJob=null;
+ $("#zipbar").hidden=true;$("#prog").hidden=true;$("#ptxt").textContent="";
+ drawQ();drawRes()};
+$("#zip").onclick=async()=>{
+ if(srvJob){location.href=srvJob;return}
+ const z=new JSZip();
+ results.forEach((f,i)=>f.pages.forEach(p=>z.file(`${pad(i+1)}_${f.name.replace(/\.[^.]+$/,"")}/${p.name}`,p.blob)));
+ const b=await z.generateAsync({type:"blob",compression:"STORE"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="converted_jpg.zip";a.click();
+};
 
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('bg-blue-50');
-            const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-            if (files.length > 0) {
-                processMultiplePDFs(files);
-            } else {
-                alert('অনুগ্রহ করে এক বা একাধিক বৈধ PDF ফাইল আপলোড করুন।');
-            }
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                processMultiplePDFs(Array.from(e.target.files));
-            }
-        });
-
-        clearBtn.addEventListener('click', () => {
-            imageGrid.innerHTML = '';
-            convertedImages = [];
-            resultsArea.classList.add('hidden');
-            uploadArea.classList.remove('hidden');
-            fileInput.value = '';
-        });
-
-        async function processMultiplePDFs(files) {
-            uploadArea.classList.add('hidden');
-            statusArea.classList.remove('hidden');
-            imageGrid.innerHTML = '';
-            convertedImages = [];
-            
-            let totalProcessedPages = 0;
-            
-            try {
-                // First pass to count total pages for global progress
-                let totalExpectedPages = 0;
-                for (const file of files) {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                    totalExpectedPages += pdf.numPages;
-                }
-
-                for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
-                    const file = files[fileIdx];
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                    const numPages = pdf.numPages;
-                    const fileName = file.name;
-
-                    for (let i = 1; i <= numPages; i++) {
-                        totalProcessedPages++;
-                        const globalPercent = Math.round((totalProcessedPages / totalExpectedPages) * 100);
-                        
-                        statusText.innerText = `প্রসেসিং ফাইল (${fileIdx + 1}/${files.length}): ${fileName}`;
-                        fileInfo.innerText = `পৃষ্ঠা ${i}/${numPages} (মোট প্রগতি: ${globalPercent}%)`;
-                        progressBar.style.width = `${globalPercent}%`;
-                        progressPercent.innerText = `${globalPercent}%`;
-
-                        const page = await pdf.getPage(i);
-                        const viewport = page.getViewport({ scale: 2.0 });
-                        
-                        canvas.width = viewport.width;
-                        canvas.height = viewport.height;
-
-                        await page.render({
-                            canvasContext: ctx,
-                            viewport: viewport
-                        }).promise;
-
-                        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                        const uniqueName = `${fileName.replace('.pdf', '')}_page_${i}`;
-                        convertedImages.push({ dataUrl: imageDataUrl, name: uniqueName });
-                        
-                        createImageCard(imageDataUrl, uniqueName);
-                    }
-                }
-
-                statusArea.classList.add('hidden');
-                resultsArea.classList.remove('hidden');
-                progressBar.style.width = '0%';
-
-            } catch (error) {
-                console.error(error);
-                alert('দুঃখিত! ফাইলগুলো প্রসেস করতে সমস্যা হয়েছে।');
-                uploadArea.classList.remove('hidden');
-                statusArea.classList.add('hidden');
-            }
-        }
-
-        function createImageCard(dataUrl, title) {
-            const div = document.createElement('div');
-            div.className = 'bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm transition hover:shadow-md';
-            
-            div.innerHTML = `
-                <div class="relative aspect-[3/4] bg-white">
-                    <img src="${dataUrl}" class="w-full h-full object-contain p-2" alt="${title}">
-                    <div class="absolute top-2 left-2 bg-blue-600 text-white text-[10px] px-2 py-1 rounded shadow max-w-[80%] truncate">
-                        ${title}
-                    </div>
-                </div>
-                <div class="p-3 bg-white border-t border-gray-100 flex justify-center">
-                    <button onclick="downloadImage('${dataUrl}', '${title}')" class="w-full bg-gray-800 hover:bg-black text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        ডাউনলোড
-                    </button>
-                </div>
-            `;
-            imageGrid.appendChild(div);
-        }
-
-        window.downloadImage = function(dataUrl, title) {
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `${title}.jpg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
-
-        downloadZipBtn.addEventListener('click', async () => {
-            if (convertedImages.length === 0) return;
-
-            const zip = new JSZip();
-            const imgFolder = zip.folder("converted_images");
-
-            convertedImages.forEach((img) => {
-                const base64Data = img.dataUrl.split(',')[1];
-                imgFolder.file(`${img.name}.jpg`, base64Data, {base64: true});
-            });
-
-            const content = await zip.generateAsync({type: "blob"});
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(content);
-            link.download = "all_pdf_pages.zip";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-    </script>
+function drawRes(){
+ const R=$("#results");R.innerHTML="";
+ results.forEach(f=>{
+  const d=document.createElement("section");d.className="file";
+  const h=document.createElement("h3");h.textContent=f.name;d.append(h);
+  if(f.error){const p=document.createElement("div");p.className="err";p.textContent=T[L].e[f.error]||T[L].e.failed;d.append(p)}
+  else if(f.pages.length){
+   const m=document.createElement("div");m.className="meta";m.textContent=`${f.pages.length} ${T[L].pages}`;d.append(m);
+   const g=document.createElement("div");g.className="grid";
+   f.pages.forEach((p,i)=>{
+    const c=document.createElement("div");c.className="pg";
+    c.innerHTML='<img loading="lazy" alt=""><div class="meta"></div><a></a>';
+    const im=c.querySelector("img");im.src=p.url;im.alt=`${T[L].page} ${i+1}`;
+    c.querySelector(".meta").textContent=`${T[L].page} ${i+1} · ${p.w_in}×${p.h_in} in · ${p.wpx}×${p.hpx}px`;
+    const a=c.querySelector("a");a.href=p.dl||p.url;a.download=p.name;a.textContent=T[L].dl;g.append(c)});
+   d.append(g)}
+  else{const p=document.createElement("div");p.className="meta";p.textContent="…";d.append(p)}
+  R.append(d)})
+}
+tr();
+</script>
 </body>
 </html>
